@@ -1,10 +1,10 @@
 package org.symphonyoss.symphony.messageml.elements;
 
 import org.commonmark.node.Node;
+import org.symphonyoss.symphony.messageml.MessageMLContext;
 import org.symphonyoss.symphony.messageml.MessageMLParser;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
 import org.symphonyoss.symphony.messageml.exceptions.ProcessingException;
-import org.symphonyoss.symphony.messageml.markdown.nodes.form.FormElementNode;
 import org.symphonyoss.symphony.messageml.markdown.nodes.form.PersonSelectorNode;
 import org.symphonyoss.symphony.messageml.util.XmlPrintStream;
 import org.w3c.dom.NamedNodeMap;
@@ -22,7 +22,7 @@ import java.util.Set;
  * @author Cristiano Faustino
  * @since 06/11/2019
  */
-public class PersonSelector extends FormElement {
+public class PersonSelector extends FormElement implements LabelableElement, TooltipableElement {
   public static final String MESSAGEML_TAG = "person-selector";
 
   private static final String PLACEHOLDER_ATTR = "placeholder";
@@ -42,13 +42,13 @@ public class PersonSelector extends FormElement {
   }
 
   @Override
-  public void buildAll(MessageMLParser context, org.w3c.dom.Element element) throws InvalidInputException, ProcessingException {
+  public void buildAll(MessageMLParser parser, org.w3c.dom.Element element) throws InvalidInputException, ProcessingException {
     switch (getFormat()) {
       case MESSAGEML:
-        super.buildAll(context, element);
+        super.buildAll(parser, element);
         break;
       case PRESENTATIONML:
-        buildElementFromDiv(context, element);
+        buildElementFromDiv(parser, element);
         this.validate();
         break;
       default:
@@ -67,47 +67,65 @@ public class PersonSelector extends FormElement {
     if(getAttribute(REQUIRED_ATTR) != null) {
       assertAttributeValue(REQUIRED_ATTR, VALID_VALUES_FOR_REQUIRED_ATTR);
     }
-    
+
     assertNoContent();
     assertAttributeNotBlank(NAME_ATTR);
   }
 
   @Override
-  public void asPresentationML(XmlPrintStream out) {
+  public void asPresentationML(XmlPrintStream out,
+      MessageMLContext context) {
     Map<String, String> presentationAttrs = buildPersonSelectorInputAttributes();
+    if(isSplittable()){
+      // open div + adding splittable elements
+      presentationAttrs.put("id", splittableAsPresentationML(out, context));
+      // render element
+      innerAsPresentationML(out, presentationAttrs);
+      // close div
+      out.closeElement();
+    } else {
+      innerAsPresentationML(out, presentationAttrs);
+    }
+  }
+
+  private void innerAsPresentationML(XmlPrintStream out, Map<String, String> presentationAttrs){
     out.openElement(PRESENTATIONML_TAG, presentationAttrs);
     out.closeElement();
   }
 
   @Override
   public Node asMarkdown() {
-    return new PersonSelectorNode(getAttribute(PLACEHOLDER_ATTR));
+    return new PersonSelectorNode(getAttribute(PLACEHOLDER_ATTR), getAttribute(LABEL), getAttribute(TITLE));
   }
 
   @Override
-  protected void buildAttribute(org.w3c.dom.Node item) throws InvalidInputException {
+  protected void buildAttribute(MessageMLParser parser,
+      org.w3c.dom.Node item) throws InvalidInputException {
     switch (item.getNodeName()) {
       case NAME_ATTR:
-        setAttribute(NAME_ATTR, getStringAttribute(item));
-        break;
       case PLACEHOLDER_ATTR:
-        setAttribute(PLACEHOLDER_ATTR, getStringAttribute(item));
-        break;
       case REQUIRED_ATTR:
-        setAttribute(REQUIRED_ATTR, getStringAttribute(item));
+      case LABEL:
+      case TITLE:
+        setAttribute(item.getNodeName(), getStringAttribute(item));
+        break;
+      case ID_ATTR:
+        if(format != FormatEnum.PRESENTATIONML){
+          throwInvalidInputException(item);
+        }
+        fillAttributes(parser, item);
         break;
       default:
-        throw new InvalidInputException("Attribute \"" + item.getNodeName()
-            + "\" is not allowed in \"" + getMessageMLTag() + "\"");
+        throwInvalidInputException(item);
     }
   }
 
   private Map<String, String> buildPersonSelectorInputAttributes() {
     Map<String, String> presentationAttrs = new LinkedHashMap<>();
-    
+
     presentationAttrs.put(CLASS_ATTR, MESSAGEML_TAG);
     presentationAttrs.put(PRESENTATIONML_NAME_ATTR, getAttribute(NAME_ATTR));
-    
+
     if(getAttribute(PLACEHOLDER_ATTR) != null) {
       presentationAttrs.put(PRESENTATIONML_PLACEHOLDER_ATTR, getAttribute(PLACEHOLDER_ATTR));
     }
@@ -115,12 +133,12 @@ public class PersonSelector extends FormElement {
     if(getAttribute(REQUIRED_ATTR) != null) {
       presentationAttrs.put(PRESENTATIONML_REQUIRED_ATTR, getAttribute(REQUIRED_ATTR));
     }
-    
+
     return presentationAttrs;
   }
 
-  private void buildElementFromDiv(MessageMLParser context, org.w3c.dom.Element element) throws InvalidInputException, ProcessingException {
-    
+  private void buildElementFromDiv(MessageMLParser parser, org.w3c.dom.Element element) throws InvalidInputException, ProcessingException {
+
     element.setAttribute(NAME_ATTR, element.getAttribute(PRESENTATIONML_NAME_ATTR));
     element.removeAttribute(PRESENTATIONML_NAME_ATTR);
 
@@ -137,14 +155,24 @@ public class PersonSelector extends FormElement {
     NamedNodeMap attributes = element.getAttributes();
 
     for (int i = 0; i < attributes.getLength(); i++) {
-      buildAttribute(attributes.item(i));
+      buildAttribute(parser, attributes.item(i));
     }
 
     NodeList children = element.getChildNodes();
 
     for (int i = 0; i < children.getLength(); i++) {
-      buildNode(context, children.item(i));
+      buildNode(parser, children.item(i));
     }
-    
+
+  }
+
+  @Override
+  public String getPresentationMLTag() {
+    return PRESENTATIONML_TAG;
+  }
+
+  @Override
+  public String getElementId(){
+    return MESSAGEML_TAG;
   }
 }

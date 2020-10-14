@@ -1,19 +1,29 @@
 package org.symphonyoss.symphony.messageml.elements.form;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
+import org.apache.commons.lang3.StringUtils;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.symphonyoss.symphony.messageml.elements.Element;
 import org.symphonyoss.symphony.messageml.elements.ElementTest;
 import org.symphonyoss.symphony.messageml.elements.Form;
 import org.symphonyoss.symphony.messageml.elements.MessageML;
+import org.symphonyoss.symphony.messageml.elements.RegexElement;
 import org.symphonyoss.symphony.messageml.elements.TextField;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class TextFieldTest extends ElementTest {
 
   private static final String FORM_ID_ATTR = "text-field-form";
 
+  @Rule
+  public ExpectedException exceptionRule = ExpectedException.none();
 
   @Test
   public void testTextField() throws Exception {
@@ -39,24 +49,19 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, null);
+    verifyTextFieldMarkdown(null, null, null, null);
   }
 
   @Test
   public void testTextFieldWithAllAttributes() throws Exception {
     String messageMLInput = "<messageML>"
         + "<form id=\"" + FORM_ID_ATTR + "\">"
-        + "<text-field name=\"text-field\" placeholder=\"Input some text here\" required=\"true\" minlength=\"10\" maxlength=\"20\"/>"
+        + "<text-field name=\"text-field\" label=\"label text here\" title=\"title here\" "
+        + "placeholder=\"Input some text here\" required=\"true\" minlength=\"10\" maxlength=\"20\"/>"
         + ACTION_BTN_ELEMENT
         + "</form>"
         + "</messageML>";
-
-    String expectedPresentationML = "<div data-format=\"PresentationML\" data-version=\"2.0\">"
-        + "<form id=\"text-field-form\">"
-        + "<input type=\"text\" name=\"text-field\" placeholder=\"Input some text here\" required=\"true\" minlength=\"10\" maxlength=\"20\"/>"
-        + ACTION_BTN_ELEMENT
-        + "</form>"
-        + "</div>";
+    
     context.parseMessageML(messageMLInput, null, MessageML.MESSAGEML_VERSION);
 
     Element messageML = context.getMessageML();
@@ -66,9 +71,26 @@ public class TextFieldTest extends ElementTest {
     assertEquals(Form.class, form.getClass());
     assertEquals(TextField.class, textField.getClass());
 
+    String presentationML = context.getPresentationML();
+    String textFieldRegex = ".*(\"textfield-(.*?)\").*";
+    Pattern pattern = Pattern.compile(textFieldRegex);
+    Matcher matcher = pattern.matcher(presentationML);
+    String uniqueLabelId = matcher.matches() ? matcher.group(2) : null;
+
+    String expectedPresentationML = "<div data-format=\"PresentationML\" data-version=\"2.0\">"
+        + "<form id=\"text-field-form\">"
+        + "<div class=\"textfield-group\" data-generated=\"true\">"
+        + "<label for=\"textfield-" + uniqueLabelId + "\">label text here</label>"
+        + "<span class=\"info-hint\" data-target-id=\"textfield-" + uniqueLabelId + "\" data-title=\"title here\"></span>"
+        + "<input type=\"text\" name=\"text-field\" placeholder=\"Input some text here\" required=\"true\" minlength=\"10\" maxlength=\"20\" id=\"textfield-" + uniqueLabelId + "\"/>"
+        + "</div>"
+        + ACTION_BTN_ELEMENT
+        + "</form>"
+        + "</div>";
+    
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
-        expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown("Input some text here", null);
+        expectedPresentationML, presentationML);
+    verifyTextFieldMarkdown("Input some text here", null, "label text here", "title here");
   }
 
   @Test
@@ -97,7 +119,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown("Input some text here", null);
+    verifyTextFieldMarkdown("Input some text here", null, null, null);
   }
 
   @Test
@@ -124,7 +146,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, null);
+    verifyTextFieldMarkdown(null, null, null, null);
   }
 
   @Test
@@ -151,7 +173,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, null);
+    verifyTextFieldMarkdown(null, null, null, null);
   }
 
   @Test
@@ -178,7 +200,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown("Input some text...", "Initial value");
+    verifyTextFieldMarkdown("Input some text...", "Initial value", null, null);
   }
 
   @Test
@@ -205,7 +227,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, null);
+    verifyTextFieldMarkdown(null, null, null, null);
   }
 
   @Test
@@ -232,15 +254,16 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, null);
+    verifyTextFieldMarkdown(null, null, null, null);
   }
 
   @Test
   public void testTextFieldInvalidAttrPresentationML() throws Exception {
-    String input = "<messageML><form><input type=\"text\" name=\"name1\" id=\"id1\" placeholder=\"placeholder1\" required=\"true\"/></form></messageML>";
+    String input =
+        "<div data-format=\"PresentationML\" data-version=\"2.0\"><form id=\"form\"><input type=\"text\" name=\"name1\" invalid=\"invalid\" placeholder=\"placeholder1\" required=\"true\"/><button type=\"action\" name=\"send-answers\">Submit</button></form></div>";
 
     expectedException.expect(InvalidInputException.class);
-    expectedException.expectMessage("Attribute \"id\" is not allowed in \"text-field\"");
+    expectedException.expectMessage("Attribute \"invalid\" is not allowed in \"text-field\"");
 
     context.parseMessageML(input, null, MessageML.MESSAGEML_VERSION);
   }
@@ -335,7 +358,7 @@ public class TextFieldTest extends ElementTest {
         + "</div>";
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, "Value here");
+    verifyTextFieldMarkdown(null, "Value here", null, null);
   }
 
   @Test
@@ -365,7 +388,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, "value");
+    verifyTextFieldMarkdown(null, "value", null, null);
   }
 
   @Test
@@ -478,7 +501,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(null, null);
+    verifyTextFieldMarkdown(null, null, null, null);
   }
 
   @Test
@@ -507,7 +530,7 @@ public class TextFieldTest extends ElementTest {
 
     assertEquals("The parsed content should be equivalent to the expected presentation ML",
         expectedPresentationML, context.getPresentationML());
-    verifyTextFieldMarkdown(placeholder, null);
+    verifyTextFieldMarkdown(placeholder, null, null, null);
   }
 
   @Test
@@ -560,16 +583,103 @@ public class TextFieldTest extends ElementTest {
     context.parseMessageML(input, null, MessageML.MESSAGEML_VERSION);
   }
 
-  private String getExpectedTextFieldMarkdown(String placeholder, String initialValue) {
+  @Test
+  public void testTextFieldWithRegex() throws Exception {
+    String messageMLInput = "<messageML>"
+        + "<form id=\"" + FORM_ID_ATTR + "\">"
+        + "<text-field name=\"text-field\" pattern=\"regex\" pattern-error-message=\"Regex Error\"/>"
+        + ACTION_BTN_ELEMENT
+        + "</form></messageML>";
+    String expectedPresentationML = "<div data-format=\"PresentationML\" data-version=\"2.0\">"
+        + "<form id=\"" + FORM_ID_ATTR + "\">"
+        + "<input type=\"text\" name=\"text-field\" pattern=\"regex\" "
+        + "data-pattern-error-message=\"Regex Error\"/>"
+        + ACTION_BTN_ELEMENT
+        + "</form>"
+        + "</div>";
+
+    context.parseMessageML(messageMLInput, null, MessageML.MESSAGEML_VERSION);
+    Element messageML = context.getMessageML();
+    Element form = messageML.getChildren().get(0);
+    Element textArea = form.getChildren().get(0);
+
+    assertEquals(Form.class, form.getClass());
+    assertEquals(TextField.class, textArea.getClass());
+    assertEquals("PresentationML", expectedPresentationML, context.getPresentationML());
+    assertTrue("Text should be empty", textArea.getChildren().isEmpty());
+  }
+
+  @Test
+  public void testTextFieldWithInvalidRegex() throws Exception {
+    String invalidRegex = "[abc+";
+
+    exceptionRule.expect(InvalidInputException.class);
+    exceptionRule.expectMessage(String.format(RegexElement.REGEX_NOT_VALID_ERR, invalidRegex));
+
+    String messageMLInput = "<messageML>"
+        + "<form id=\"" + FORM_ID_ATTR + "\">"
+        + "<text-field name=\"text-field\" pattern=\"" + invalidRegex + "\" pattern-error-message=\"Regex Error\"/>"
+        + ACTION_BTN_ELEMENT
+        + "</form></messageML>";
+    context.parseMessageML(messageMLInput, null, MessageML.MESSAGEML_VERSION);
+  }
+
+  @Test
+  public void testTextFieldWithMissingPatternError() throws Exception {
+
+    exceptionRule.expect(InvalidInputException.class);
+    exceptionRule.expectMessage(String.format(RegexElement.ATTRIBUTE_MANDATORY_WHEN_ATTRIBUTE_DEFINED_ERR, RegexElement.PATTERN_ERROR_MESSAGE_ATTR, RegexElement.PATTERN_ATTR));
+
+    String messageMLInput = "<messageML>"
+        + "<form id=\"" + FORM_ID_ATTR + "\">"
+        + "<text-field name=\"text-field\" pattern=\"\"/>"
+        + ACTION_BTN_ELEMENT
+        + "</form></messageML>";
+    context.parseMessageML(messageMLInput, null, MessageML.MESSAGEML_VERSION);
+  }
+
+  @Test
+  public void testTextFieldPatternTooLong() throws Exception {
+    String regexTooLong = StringUtils.leftPad("", RegexElement.PATTERN_MAX_LENGTH + 1);
+
+    exceptionRule.expect(InvalidInputException.class);
+    exceptionRule.expectMessage(String.format(RegexElement.ATTRIBUTE_TOO_LONG_ERR, RegexElement.PATTERN_ATTR, RegexElement.PATTERN_MAX_LENGTH));
+
+    String messageMLInput = "<messageML>"
+        + "<form id=\"" + FORM_ID_ATTR + "\">"
+        + "<text-field name=\"text-field\" pattern=\"" + regexTooLong + "\" pattern-error-message=\"Regex Error\"/>"
+        + ACTION_BTN_ELEMENT
+        + "</form></messageML>";
+    context.parseMessageML(messageMLInput, null, MessageML.MESSAGEML_VERSION);
+  }
+
+  @Test
+  public void testTextFieldPatternErrorTooLong() throws Exception {
+    String errTooLong = StringUtils.leftPad("", RegexElement.PATTERN_ERROR_MESSAGE_MAX_LENGTH + 1);
+
+    exceptionRule.expect(InvalidInputException.class);
+    exceptionRule.expectMessage(String.format(RegexElement.ATTRIBUTE_TOO_LONG_ERR, RegexElement.PATTERN_ERROR_MESSAGE_ATTR, RegexElement.PATTERN_ERROR_MESSAGE_MAX_LENGTH));
+
+    String messageMLInput = "<messageML>"
+        + "<form id=\"" + FORM_ID_ATTR + "\">"
+        + "<text-field name=\"text-field\" pattern=\"\" pattern-error-message=\"" + errTooLong + "\"/>"
+        + ACTION_BTN_ELEMENT
+        + "</form></messageML>";
+    context.parseMessageML(messageMLInput, null, MessageML.MESSAGEML_VERSION);
+  }
+
+  private String getExpectedTextFieldMarkdown(String placeholder, String initialValue, String label, String title) {
     String expectedMarkdownText = ((placeholder != null) ? "[" + placeholder + "]" : "") +
-        ((initialValue != null) ? initialValue : "") ;
-    
+        ((label != null) ? "[" + label + "]" : "") +
+        ((title != null) ? "[" + title + "]" : "") +
+        ((initialValue != null) ? initialValue : "");
+
     return String.format("Form (log into desktop client to answer):\n---\n(Text Field%s)"+ ACTION_BTN_MARKDOWN + "\n---\n", (!expectedMarkdownText.isEmpty()) ? ":" + expectedMarkdownText : "");
   }
 
-  private void verifyTextFieldMarkdown(String placeholder, String initialValue) {
+  private void verifyTextFieldMarkdown(String placeholder, String initialValue, String label, String title) {
     String markdown = context.getMarkdown();
-    String expectedMarkdown  = getExpectedTextFieldMarkdown(placeholder, initialValue);
+    String expectedMarkdown  = getExpectedTextFieldMarkdown(placeholder, initialValue, label, title);
     assertEquals(expectedMarkdown, markdown);
   }
 }

@@ -22,27 +22,28 @@ import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
 import org.symphonyoss.symphony.messageml.util.XmlPrintStream;
 import org.w3c.dom.Node;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Class representing a convenience element which has a number of visual elements and which can be opened and closed.
+ * Class representing a convenience element which has a number of visual elements and which can be closed, expanded, cropped.
  * Translated to a div element.
  *
- * @author lukasz
- * @since 3/27/17
+ * @author enrico.molino
+ * @since 8/7/20
  */
-public class Card extends Element {
+public class ExpandableCard extends Element {
 
-  public static final String MESSAGEML_TAG = "card";
-  public static final String PRESENTATIONML_CLASS = "card";
+  public static final String MESSAGEML_TAG = "expandable-card";
+  public static final String PRESENTATIONML_CLASS = "expandable-card";
   private static final String PRESENTATIONML_TAG = "div";
-  private static final String ATTR_ICON = "iconSrc";
-  private static final String ATTR_ACCENT = "accent";
-  private static final String PRESENTATIONML_ICON = "data-icon-src";
-  private static final String PRESENTATIONML_ACCENT = "data-accent-color";
+  private static final String ATTR_STATE = "state";
+  private static final String PRESENTATIONML_STATE = "data-state";
+  private static final List<String> allowedStates = Arrays.asList("collapsed", "cropped", "expanded");
 
-  public Card(Element parent, FormatEnum format) {
+  public ExpandableCard(Element parent, FormatEnum format) {
     super(parent, MESSAGEML_TAG, format);
   }
 
@@ -50,13 +51,9 @@ public class Card extends Element {
   protected void buildAttribute(MessageMLParser parser,
       Node item) throws InvalidInputException {
     switch (item.getNodeName()) {
-      case PRESENTATIONML_ICON:
-      case ATTR_ICON:
-        setAttribute(ATTR_ICON, getStringAttribute(item));
-        break;
-      case PRESENTATIONML_ACCENT:
-      case ATTR_ACCENT:
-        setAttribute(ATTR_ACCENT, getStringAttribute(item));
+      case PRESENTATIONML_STATE:
+      case ATTR_STATE:
+        setAttribute(ATTR_STATE, getStringAttribute(item));
         break;
       default:
         super.buildAttribute(parser, item);
@@ -72,11 +69,8 @@ public class Card extends Element {
     } else {
       presentationAttrs.put(CLASS_ATTR, PRESENTATIONML_CLASS);
     }
-    if (getAttribute(ATTR_ICON) != null) {
-      presentationAttrs.put(PRESENTATIONML_ICON, getAttribute(ATTR_ICON));
-    }
-    if (getAttribute(ATTR_ACCENT) != null) {
-      presentationAttrs.put(PRESENTATIONML_ACCENT, getAttribute(ATTR_ACCENT));
+    if (getAttribute(ATTR_STATE) != null) {
+      presentationAttrs.put(PRESENTATIONML_STATE, getAttribute(ATTR_STATE));
     }
 
     out.openElement(PRESENTATIONML_TAG, presentationAttrs);
@@ -91,5 +85,13 @@ public class Card extends Element {
   @Override
   public String getPresentationMLTag() {
     return PRESENTATIONML_TAG;
+  }
+
+  @Override
+  void validate() throws InvalidInputException {
+    super.validate();
+
+    assertAttributeNotBlank(ATTR_STATE);
+    assertAttributeValue(ATTR_STATE, allowedStates);
   }
 }

@@ -23,33 +23,53 @@ import org.symphonyoss.symphony.messageml.MessageMLParser;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
 import org.symphonyoss.symphony.messageml.util.XmlPrintStream;
 
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Class representing a convenience element for a card body container. Translated to a div element.
- * @author lukasz
- * @since 3/27/17
+ * Class representing a convenience element for an expandable card body container. Translated to a div element.
+ *
+ * @author enrico.molino
+ * @since 8/7/20
  */
-public class CardBody extends Element {
+public class ExpandableCardBody extends Element {
 
   public static final String MESSAGEML_TAG = "body";
-  public static final String PRESENTATIONML_CLASS = "cardBody";
+  public static final String PRESENTATIONML_CLASS = "expandableCardBody";
   private static final String PRESENTATIONML_TAG = "div";
+  private static final String ATTR_VARIANT = "variant";
+  private static final String PRESENTATIONML_VARIANT = "data-variant";
+  private static final List<String> allowedVariants = Arrays.asList("default", "error");
 
-  public CardBody(Element parent, FormatEnum format) {
+  public ExpandableCardBody(Element parent, FormatEnum format) {
     super(parent, MESSAGEML_TAG, format);
   }
 
   @Override
   void buildAttribute(MessageMLParser parser,
       org.w3c.dom.Node item) throws InvalidInputException {
-    throwInvalidInputException(item);
+    switch (item.getNodeName()) {
+      case PRESENTATIONML_VARIANT:
+      case ATTR_VARIANT:
+        setAttribute(ATTR_VARIANT, getStringAttribute(item));
+        break;
+      default:
+        throwInvalidInputException(item);
+    }
   }
 
   @Override
   public void asPresentationML(XmlPrintStream out,
       MessageMLContext context) {
-    out.openElement(PRESENTATIONML_TAG, Collections.singletonMap(CLASS_ATTR, PRESENTATIONML_CLASS));
+    Map<String, String> presentationAttrs = new LinkedHashMap<>();
+    presentationAttrs.put(CLASS_ATTR, PRESENTATIONML_CLASS);
+    if (getAttribute(ATTR_VARIANT) != null) {
+      presentationAttrs.put(PRESENTATIONML_VARIANT, getAttribute(ATTR_VARIANT));
+    }
+    out.openElement(PRESENTATIONML_TAG, presentationAttrs);
 
     for (Element child : getChildren()) {
       child.asPresentationML(out, context);
@@ -65,8 +85,12 @@ public class CardBody extends Element {
 
   @Override
   void validate() throws InvalidInputException {
-    assertNoAttributes();
-    assertParent(Collections.singleton(Card.class));
+    super.validate();
+
+    assertParent(Collections.singleton(ExpandableCard.class));
+    if(getAttribute(ATTR_VARIANT) != null){
+      assertAttributeValue(ATTR_VARIANT, allowedVariants);
+    }
   }
 
   @Override

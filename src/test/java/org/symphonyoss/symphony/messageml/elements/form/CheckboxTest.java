@@ -11,6 +11,7 @@ import org.symphonyoss.symphony.messageml.elements.MessageML;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class CheckboxTest extends ElementTest {
   private String formId;
@@ -27,7 +28,7 @@ public class CheckboxTest extends ElementTest {
     this.text = "Checkbox Text";
     this.checked = "false";
   }
-  
+
   @Test
   public void testPresentationMLCheckBoxWithLinebreaksAndWhitespacesBetweenTags() throws Exception {
     String input = String.format("<div data-format=\"PresentationML\" data-version=\"2.0\">" +
@@ -71,7 +72,8 @@ public class CheckboxTest extends ElementTest {
     verifyMessageMLObjectsForCheckbox(context);
     String presentationML = context.getPresentationML();
     String expectedPresentationML =
-        "<div data-format=\"PresentationML\" data-version=\"2.0\"><form id=\"checkbox-form\"><input type=\"checkbox\" name=\"checkbox-name\" value=\"on\"/><button type=\"action\" name=\"actionName\">Send</button></form></div>";
+        String.format("<div data-format=\"PresentationML\" data-version=\"2.0\"><form id=\"checkbox-form\"><input type=\"checkbox\" name=\"checkbox-name\" value=\"on\"/>" +
+                "<button type=\"action\" name=\"actionName\">Send</button></form></div>", RadioTest.getInputId(presentationML));
     assertEquals(expectedPresentationML, presentationML);
 
     verifyCheckboxMarkdown(context, null);
@@ -93,18 +95,43 @@ public class CheckboxTest extends ElementTest {
   }
 
   @Test
-  public void testInvalidAttrPresentationMLCheckbox() throws Exception {
+  public void testLabelAttrPresentationMLCheckbox() throws Exception {
     String input = "<div data-format=\"PresentationML\" data-version=\"2.0\">" +
         "<form id=\"" + formId + "\">" +
         "<div class=\"checkbox-group\">" +
-        "<input id=\"id1\" type=\"checkbox\" name=\"name2\" value=\"value1\"/>" +
+        "<input dummy=\"test\" id=\"id1\" type=\"checkbox\" name=\"name2\" value=\"value1\"/>" +
         "<label>Text 1</label>" +
         "</div></form></div>";
 
     expectedException.expect(InvalidInputException.class);
-    expectedException.expectMessage("Attribute \"id\" is not allowed in \"checkbox\"");
-
+    expectedException.expectMessage("Attribute \"dummy\" is not allowed in \"checkbox\"");
     context.parseMessageML(input, null, MessageML.MESSAGEML_VERSION);
+  }
+
+  @Test
+  public void testLabelMessageMLCheckbox() throws Exception {
+    String input = "<messageML>\n"
+        + "   <form id=\"example\">\n"
+        + "      <checkbox name=\"fruits\" value=\"orange\">Orange</checkbox> \n"
+        + "      <button type=\"action\" name=\"send-answers\">Submit</button>\n"
+        + "   </form>\n"
+        + "</messageML>";
+    context.parseMessageML(input, "", MessageML.MESSAGEML_VERSION);
+    String presentationML = context.getPresentationML();
+    int startId = presentationML.indexOf("label for=\"");
+    int endId = presentationML.indexOf('"', startId + "label for=\"".length());
+    String id = presentationML.substring(startId + "label for=\"".length(), endId);
+    assertTrue(id.startsWith("checkbox-group-"));
+
+    String expectedResult = String.format(
+        "<div data-format=\"PresentationML\" data-version=\"2.0\">"
+        + "    <form id=\"example\">"
+        + "       <div class=\"checkbox-group\"><input type=\"checkbox\" name=\"fruits\" value=\"orange\" id=\"%s\"/><label "
+        + "for=\"%s\">Orange</label></div>"
+        + "        <button type=\"action\" name=\"send-answers\">Submit</button>"
+        + "    </form>"
+        + " </div>", id, id);
+    assertEquals(expectedResult, presentationML);
   }
 
   @Test
@@ -232,9 +259,9 @@ public class CheckboxTest extends ElementTest {
     verifyMessageMLObjectsForCheckbox(context);
     String presentationML = context.getPresentationML();
     String expectedPresentationML =
-        "<div data-format=\"PresentationML\" data-version=\"2.0\"><form id=\"checkbox-form\"><input type=\"checkbox\" name=\"checkbox-name\" checked=\"false\" value=\"checkbox-value\"/><button type=\"action\" name=\"actionName\">Send</button></form></div>";
+        String.format("<div data-format=\"PresentationML\" data-version=\"2.0\"><form id=\"checkbox-form\"><input type=\"checkbox\" name=\"checkbox-name\" checked=\"false\" value=\"checkbox-value\"/>" +
+                "<button type=\"action\" name=\"actionName\">Send</button></form></div>", RadioTest.getInputId(presentationML));
     assertEquals(expectedPresentationML, presentationML);
-
     verifyCheckboxMarkdown(context, null);
   }
 
@@ -342,16 +369,17 @@ public class CheckboxTest extends ElementTest {
 
   private void verifyCheckboxPresentationML(MessageMLContext context, String name, String value, String text, String checked, boolean shouldShowChecked) {
     String presentationML = context.getPresentationML();
-    String expectedPresentationML = buildExpectedPresentationMLForCheckbox(name, value, text, checked, shouldShowChecked);
+    String id = RadioTest.getInputId(presentationML);
+    String expectedPresentationML = buildExpectedPresentationMLForCheckbox(id, name, value, text, checked, shouldShowChecked);
     assertEquals(expectedPresentationML, presentationML);
   }
 
-  private String buildExpectedPresentationMLForCheckbox(String name, String value, String text, String checked, boolean shouldShowChecked) {
+  private String buildExpectedPresentationMLForCheckbox(String id, String name, String value, String text, String checked, boolean shouldShowChecked) {
     return "<div data-format=\"PresentationML\" data-version=\"2.0\"><form id=\"" + formId + "\"><div class=\"checkbox-group\"><input type=\"checkbox\"" +
         String.format(" name=\"%s\"", name) +
         (shouldShowChecked ? String.format(" checked=\"%s\"", checked) : "") +
         (value != null ? String.format(" value=\"%s\"", value) : " value=\"on\"") +
-        "/><label>" +
+        " id=\"" + id + "\"/><label for=\""+ id + "\">" +
         (text != null ? text : "") +
         "</label></div>" + ACTION_BTN_ELEMENT + "</form></div>";
   }

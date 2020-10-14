@@ -17,7 +17,9 @@
 package org.symphonyoss.symphony.messageml.elements;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.symphonyoss.symphony.messageml.MessageMLParser;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
+import org.w3c.dom.Node;
 
 /**
  * Class representing an inline container for inline content.
@@ -35,16 +37,18 @@ public class Span extends Element {
   }
 
   @Override
-  protected void buildAttribute(org.w3c.dom.Node item) throws InvalidInputException {
-    switch (item.getNodeName()) {
-
-      case ATTR_ENTITY_ID:
-        setAttribute(ATTR_ENTITY_ID, getStringAttribute(item));
-        break;
-
-      default:
-        super.buildAttribute(item);
-    }
+  protected void buildAttribute(MessageMLParser parser,
+      Node item) throws InvalidInputException {
+      switch (item.getNodeName()) {
+        case ATTR_ENTITY_ID:
+        // A span can be also generated to contains a tooltip
+        case TooltipableElement.DATA_TITLE:
+        case TooltipableElement.DATA_TARGET_ID:
+          setAttribute(item.getNodeName(), getStringAttribute(item));
+          break;
+        default:
+          super.buildAttribute(parser, item);
+      }
   }
 
   @Override

@@ -1,14 +1,11 @@
 package org.symphonyoss.symphony.messageml.elements;
 
-import static java.lang.String.format;
-
 import org.symphonyoss.symphony.messageml.MessageMLParser;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
 import org.symphonyoss.symphony.messageml.exceptions.ProcessingException;
-import org.symphonyoss.symphony.messageml.markdown.nodes.form.FormElementNode;
 import org.symphonyoss.symphony.messageml.markdown.nodes.form.TextFieldNode;
-import org.symphonyoss.symphony.messageml.util.XmlPrintStream;
 import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.util.Arrays;
@@ -24,13 +21,12 @@ import java.util.Set;
  * @author Lucas Macedo
  * @since 06/07/2019
  */
-public class TextField extends FormElement {
+public class TextField extends FormElement implements RegexElement, LabelableElement, TooltipableElement, MinMaxLengthElement {
 
   public static final String MESSAGEML_TAG = "text-field";
+  public static final String ELEMENT_ID = "textfield";
   public static final String PRESENTATIONML_INPUT_TYPE = "text";
 
-  private static final String MINLENGTH_ATTR = "minlength";
-  private static final String MAXLENGTH_ATTR = "maxlength";
   private static final String REQUIRED_ATTR = "required";
   private static final String MASKED_ATTR = "masked";
   private static final String PLACEHOLDER_ATTR = "placeholder";
@@ -70,56 +66,52 @@ public class TextField extends FormElement {
   }
 
   @Override
-  public void buildAll(MessageMLParser context, org.w3c.dom.Element element)
+  public void buildAll(MessageMLParser parser, org.w3c.dom.Element element)
       throws InvalidInputException, ProcessingException {
     switch (getFormat()) {
       case MESSAGEML:
-        super.buildAll(context, element);
+        super.buildAll(parser, element);
         break;
       case PRESENTATIONML:
-        this.buildAllFromPresentationML(element);
+        this.buildAllFromPresentationML(parser, element);
         break;
     }
-  }
-
-  @Override
-  public void asPresentationML(XmlPrintStream out) {
-    out.printElement(INPUT_TAG, buildTextFieldInputAttributes());
   }
 
   @Override
   public org.commonmark.node.Node asMarkdown() {
-    return new TextFieldNode(getAttribute(PLACEHOLDER_ATTR), hasExactNumberOfChildren(1) ? getChild(0).asText() : null);
+    return new TextFieldNode(getAttribute(PLACEHOLDER_ATTR), hasExactNumberOfChildren(1) ? getChild(0).asText() : null,
+        getAttribute(LABEL), getAttribute(TITLE));
   }
 
   @Override
-  protected void buildAttribute(org.w3c.dom.Node item) throws InvalidInputException {
+  protected void buildAttribute(MessageMLParser parser,
+      Node item) throws InvalidInputException {
     switch (item.getNodeName()) {
       case NAME_ATTR:
-        setAttribute(NAME_ATTR, getStringAttribute(item));
-        break;
       case REQUIRED_ATTR:
-        setAttribute(REQUIRED_ATTR, getStringAttribute(item));
-        break;
       case PLACEHOLDER_ATTR:
-        setAttribute(PLACEHOLDER_ATTR, getStringAttribute(item));
-        break;
       case MINLENGTH_ATTR:
-        setAttribute(MINLENGTH_ATTR, getStringAttribute(item));
-        break;
       case MAXLENGTH_ATTR:
-        setAttribute(MAXLENGTH_ATTR, getStringAttribute(item));
-        break;
       case MASKED_ATTR:
-        setAttribute(MASKED_ATTR, getStringAttribute(item));
+      case PATTERN_ATTR:
+      case PATTERN_ERROR_MESSAGE_ATTR:
+      case LABEL:
+      case TITLE:
+        setAttribute(item.getNodeName(), getStringAttribute(item));
+        break;
+      case ID_ATTR:
+        if(format != FormatEnum.PRESENTATIONML){
+          throwInvalidInputException(item);
+        }
+        fillAttributes(parser, item);
         break;
       default:
-        throw new InvalidInputException("Attribute \"" + item.getNodeName()
-            + "\" is not allowed in \"" + getMessageMLTag() + "\"");
+        throwInvalidInputException(item);
     }
   }
 
-  private void buildAllFromPresentationML(org.w3c.dom.Element element)
+  private void buildAllFromPresentationML(MessageMLParser parser, org.w3c.dom.Element element)
       throws InvalidInputException {
     NamedNodeMap attr = element.getAttributes();
     NodeList children = element.getChildNodes();
@@ -130,40 +122,39 @@ public class TextField extends FormElement {
     }
 
     for (int i = 0; i < attr.getLength(); i++) {
-      buildAttributeFromPresentationML(attr.item(i));
+
+      buildAttributeFromPresentationML(parser, attr.item(i));
     }
   }
 
-  private void buildAttributeFromPresentationML(org.w3c.dom.Node item) throws InvalidInputException {
+  private void buildAttributeFromPresentationML(MessageMLParser parser, org.w3c.dom.Node item) throws InvalidInputException {
     switch (item.getNodeName()) {
       case NAME_ATTR:
-        setAttribute(NAME_ATTR, getStringAttribute(item));
+      case REQUIRED_ATTR:
+      case PLACEHOLDER_ATTR:
+      case MINLENGTH_ATTR:
+      case MAXLENGTH_ATTR:
+      case LABEL:
+      case PATTERN_ATTR:
+      case PRESENTATIONML_PATTERN_ERROR_MESSAGE_ATTR:
+        setAttribute(item.getNodeName(), getStringAttribute(item));
         break;
       case VALUE_ATTR:
         addChild(new TextNode(this, getStringAttribute(item)));
         break;
-      case REQUIRED_ATTR:
-        setAttribute(REQUIRED_ATTR, getStringAttribute(item));
-        break;
-      case PLACEHOLDER_ATTR:
-        setAttribute(PLACEHOLDER_ATTR, getStringAttribute(item));
-        break;
-      case MINLENGTH_ATTR:
-        setAttribute(MINLENGTH_ATTR, getStringAttribute(item));
-        break;
-      case MAXLENGTH_ATTR:
-        setAttribute(MAXLENGTH_ATTR, getStringAttribute(item));
-        break;
       case PRESENTATIONML_MASKED_ATTR:
         setAttribute(MASKED_ATTR, getStringAttribute(item));
         break;
+      case ID_ATTR:
+        fillAttributes(parser, item);
+        break;
       default:
-        throw new InvalidInputException("Attribute \"" + item.getNodeName()
-            + "\" is not allowed in \"" + getMessageMLTag() + "\"");
+        throwInvalidInputException(item);
     }
   }
 
-  private Map<String, String> buildTextFieldInputAttributes() {
+  @Override
+  public Map<String, String> getOtherAttributes() {
     Map<String, String> presentationAttrs = new LinkedHashMap<>();
 
     presentationAttrs.put(TYPE_ATTR, PRESENTATIONML_INPUT_TYPE);
@@ -196,77 +187,48 @@ public class TextField extends FormElement {
     return presentationAttrs;
   }
 
-  private void validateMinAndMaxLengths() throws InvalidInputException {
-    Integer maxLength = getAttributeAsInteger(MAXLENGTH_ATTR);
-    if (isLengthOutOfRange(maxLength)) {
-      throw new InvalidInputException(getLengthErrorMessage(MAXLENGTH_ATTR));
+  @Override
+  public String getPresentationMLTag() {
+    return INPUT_TAG;
+  }
+
+  @Override
+  public boolean areNestedElementsAllowed(){
+    return false;
+  }
+
+  @Override
+  public String getElementId(){
+    return ELEMENT_ID;
+  }
+
+    @Override
+    public String getElementType() {
+        return MESSAGEML_TAG;
     }
 
-    Integer minLength = getAttributeAsInteger(MINLENGTH_ATTR);
-    if (isLengthOutOfRange(minLength)) {
-      throw new InvalidInputException(getLengthErrorMessage(MINLENGTH_ATTR));
+    @Override
+    public boolean hasElementInitialValue() {
+        return getChildren() != null && getChildren().size() == 1 && getChild(0) instanceof TextNode;
     }
 
-    minLength = getDefaultValueIfCurrentIsNull(minLength, MIN_ALLOWED_LENGTH);
-    maxLength = getDefaultValueIfCurrentIsNull(maxLength, MAX_ALLOWED_LENGTH);
-
-    if (isMinAndMaxLengthCombinationValid(maxLength, minLength)) {
-      throw new InvalidInputException("The attribute \"minlength\" must be lower than the \"maxlength\" attribute");
+    @Override
+    public String getElementInitialValue() {
+        return ((TextNode) getChild(0)).getText();
     }
 
-    if (textFieldHasInitialValue()) {
-      String initialValue = getTextFieldInitialValue();
-      if (isTextSmallerThanMinLength(minLength, initialValue) || isTextBiggerThanMaxLength(maxLength, initialValue)) {
-        throw new InvalidInputException(String.format(
-            "The length of this text-field's initial value must be between %s and %s", minLength, maxLength));
-      }
-    }
-  }
-
-  private Integer getDefaultValueIfCurrentIsNull(Integer currentValue, Integer defaultValue) {
-    return currentValue == null ? defaultValue : currentValue;
-  }
-
-  private String getTextFieldInitialValue() {
-    return ((TextNode) getChild(0)).getText();
-  }
-
-  private boolean isMinAndMaxLengthCombinationValid(Integer maxLength, Integer minLength) {
-    return minLength != null && maxLength != null && minLength > maxLength;
-  }
-
-  private boolean isTextBiggerThanMaxLength(Integer maxLength, String text) {
-    return text != null && maxLength != null && text.length() > maxLength;
-  }
-
-  private boolean isTextSmallerThanMinLength(Integer minLength, String text) {
-    return text != null && minLength != null && text.length() < minLength;
-  }
-
-  private boolean textFieldHasInitialValue() {
-    return getChildren() != null && getChildren().size() == 1 && getChild(0) instanceof TextNode;
-  }
-
-  private Integer getAttributeAsInteger(String attributeName) throws InvalidInputException {
-    Integer length = null;
-
-    if (getAttribute(attributeName) != null) {
-      try {
-        length = Integer.parseInt(getAttribute(attributeName));
-      } catch (NumberFormatException e) {
-        throw new InvalidInputException(format("The attribute \"%s\" must be a valid number.", attributeName));
-      }
+    @Override
+    public String getAttributeValue(String attributeName) {
+        return getAttribute(attributeName);
     }
 
-    return length;
-  }
+    @Override
+    public Integer getMinValueAllowed() {
+        return MIN_ALLOWED_LENGTH;
+    }
 
-  private boolean isLengthOutOfRange(Integer length) {
-    return length != null && (length < MIN_ALLOWED_LENGTH || length > MAX_ALLOWED_LENGTH);
-  }
-
-  private String getLengthErrorMessage(String attributeName) {
-    return format("The attribute \"%s\" must be between %s and %s", attributeName, MIN_ALLOWED_LENGTH, MAX_ALLOWED_LENGTH);
-  }
-
+    @Override
+    public Integer getMaxValueAllowed() {
+        return MAX_ALLOWED_LENGTH;
+    }
 }

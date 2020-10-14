@@ -20,7 +20,7 @@ public class ButtonTest extends ElementTest {
 
   private static final String NAME_ATTR = "name";
   private static final Set<String> VALID_CLASSES = new HashSet<>(Arrays.asList("primary", "secondary",
-      "primary-destructive", "secondary-destructive"));
+      "primary-destructive", "secondary-destructive", "tertiary", "destructive")); // primary-destructive, secondary-destructive are deprecated
   private static final String TYPE_ATTR = "type";
   private static final String CLASS_ATTR = "class";
   private static final String FORM_ID_ATTR = "text-field-form";
@@ -125,8 +125,25 @@ public class ButtonTest extends ElementTest {
       Element button = form.getChildren().get(0);
 
       assertEquals("Button class", Button.class, button.getClass());
+      if("primary-destructive".equals(clazz)) {
+        clazz = "primary";
+      }
+      if("secondary-destructive".equals(clazz)) {
+        clazz = "secondary";
+      }
       verifyButtonPresentation((Button) button, null, type, clazz, innerText);
     }
+  }
+
+  @Test
+  public void testValidateButtonNewClasses() throws Exception {
+    String input = "<messageML><form id=\"test\">"
+        + "<button name=\"send-answers\" type=\"action\" class=\"primary\">Send Answers</button>\n"
+        + "<button name=\"send-answers\" type=\"action\" class=\"secondary\">Send Answers</button>\n"
+        + "<button name=\"send-answers\" type=\"action\" class=\"tertiary\">Send Answers</button>\n"
+        + "<button name=\"send-answers\" type=\"action\" class=\"destructive\">Send Answers</button>"
+        + "</form></messageML>";
+    context.parseMessageML(input, null, MessageML.MESSAGEML_VERSION); // if no exception thrown all is ok
   }
 
   @Test
@@ -243,8 +260,9 @@ public class ButtonTest extends ElementTest {
       fail("Should have thrown an exception on invalid class button");
     } catch (Exception e) {
       assertEquals("Exception class", InvalidInputException.class, e.getClass());
-      assertEquals("Exception message", "Attribute \"class\" must be \"primary\", \"secondary\", " +
-              "\"primary-destructive\" or \"secondary-destructive\"", e.getMessage());
+      assertEquals("Exception message", "Attribute \"class\" must be \"primary\", \"secondary\", "
+          + "\"tertiary\" or \"destructive\" (\"primary-destructive\" and "
+          + "\"secondary-destructive\" are deprecated)", e.getMessage());
     }
   }
 

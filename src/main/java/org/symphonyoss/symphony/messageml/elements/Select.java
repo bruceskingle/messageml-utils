@@ -16,12 +16,14 @@
 
 package org.symphonyoss.symphony.messageml.elements;
 
+import org.symphonyoss.symphony.messageml.MessageMLParser;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
-import org.symphonyoss.symphony.messageml.markdown.nodes.form.FormElementNode;
 import org.symphonyoss.symphony.messageml.markdown.nodes.form.SelectNode;
+import org.w3c.dom.Node;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Optional;
 
 /**
  * Class representing dropdown menu - Symphony Elements.
@@ -29,13 +31,13 @@ import java.util.Collections;
  * @author lumoura
  * @since 3/22/18
  */
-public class Select extends FormElement {
+public class Select extends FormElement implements LabelableElement, TooltipableElement {
 
   public static final String MESSAGEML_TAG = "select";
+  public static final String ELEMENT_ID = "dropdown";
   private static final String REQUIRED_ATTR = "required";
   private static final String OPTION_SELECTED_ATTR = "selected";
   private static final String DATA_PLACEHOLDER_ATTR = "data-placeholder";
-
 
   public Select(Element parent) {
     super(parent, MESSAGEML_TAG);
@@ -43,7 +45,7 @@ public class Select extends FormElement {
 
   @Override
   public org.commonmark.node.Node asMarkdown() {
-    return new SelectNode(getAttribute(DATA_PLACEHOLDER_ATTR));
+    return new SelectNode(getAttribute(DATA_PLACEHOLDER_ATTR), getAttribute(LABEL), getAttribute(TITLE));
   }
 
   @Override
@@ -66,21 +68,30 @@ public class Select extends FormElement {
   }
 
   @Override
-  protected void buildAttribute(org.w3c.dom.Node item) throws InvalidInputException {
+  protected void buildAttribute(MessageMLParser parser,
+      Node item) throws InvalidInputException {
     switch (item.getNodeName()) {
       case NAME_ATTR:
-        setAttribute(NAME_ATTR, getStringAttribute(item));
-        break;
       case REQUIRED_ATTR:
-        setAttribute(REQUIRED_ATTR, getStringAttribute(item));
-        break;
       case DATA_PLACEHOLDER_ATTR:
-        setAttribute(DATA_PLACEHOLDER_ATTR, getStringAttribute(item));
+      case LABEL:
+      case TITLE:
+        setAttribute(item.getNodeName(), getStringAttribute(item));
+        break;
+      case ID_ATTR:
+        if(format != FormatEnum.PRESENTATIONML){
+          throwInvalidInputException(item);
+        }
+        fillAttributes(parser, item);
         break;
       default:
-        throw new InvalidInputException("Attribute \"" + item.getNodeName()
-            + "\" is not allowed in \"" + getMessageMLTag() + "\"");
+        throwInvalidInputException(item);
     }
+  }
+
+  @Override
+  public String getElementId(){
+    return ELEMENT_ID;
   }
 
   private void assertOnlyOneOptionSelected() throws InvalidInputException {

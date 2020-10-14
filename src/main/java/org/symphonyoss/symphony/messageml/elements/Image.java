@@ -16,8 +16,9 @@
 
 package org.symphonyoss.symphony.messageml.elements;
 
+import org.symphonyoss.symphony.messageml.MessageMLParser;
 import org.symphonyoss.symphony.messageml.exceptions.InvalidInputException;
-import org.symphonyoss.symphony.messageml.util.XmlPrintStream;
+import org.w3c.dom.Node;
 
 /**
  * Class representing an image.
@@ -35,18 +36,14 @@ public class Image extends Element {
   }
 
   @Override
-  public void asPresentationML(XmlPrintStream out) {
-    out.printElement(MESSAGEML_TAG, null, getAttributes());
-  }
-
-  @Override
-  protected void buildAttribute(org.w3c.dom.Node item) throws InvalidInputException {
+  protected void buildAttribute(MessageMLParser parser,
+      Node item) throws InvalidInputException {
     switch (item.getNodeName()) {
       case ATTR_SRC:
         setAttribute(ATTR_SRC, getStringAttribute(item));
         break;
       default:
-        super.buildAttribute(item);
+        super.buildAttribute(parser, item);
     }
   }
 
@@ -56,5 +53,10 @@ public class Image extends Element {
     if (!getAttributes().containsKey(ATTR_SRC)) {
       throw new InvalidInputException("The attribute \"src\" is required");
     }
+  }
+
+  @Override
+  public boolean areNestedElementsAllowed() {
+    return false;
   }
 }
